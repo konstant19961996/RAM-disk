@@ -218,6 +218,6 @@ module_init(rb_init);
 module_exit(rb_cleanup);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Anil Kumar Pugalia <email@sarika-pugs.com>");
+MODULE_AUTHOR("Konstantin Butuzov <bks1906@gmail.com>");
 MODULE_DESCRIPTION("Ram Block Driver");
 MODULE_ALIAS_BLOCKDEV_MAJOR(rb_major);
