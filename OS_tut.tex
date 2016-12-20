@@ -1,0 +1,962 @@
+\documentclass[11pt]{article}
+
+\usepackage[utf8x]{inputenc} % Включаем поддержку UTF8  
+\usepackage[russian]{babel}
+\title{RAM-disk driver}
+\date{17.12.2016}
+\author{Konstantin Butuzov}
+
+\begin{document}
+\pagenumbering{Arabic}
+\begin{titlepage}
+  \begin{center}
+    \large
+    МИНИСТЕРСТВО ОБРАЗОВАНИЯ И НАУКИ \\РОССИЙСКОЙ ФЕДЕРАЦИИ\\
+    федеральное государственное автономное образовательное учреждение высшего образования\\
+    «САНКТ-ПЕТЕРБУРГСКИЙ ГОСУДАРСТВЕННЫЙ УНИВЕРСИТЕТ 
+    АЭРОКОСМИЧЕСКОГО ПРИБОРОСТРОЕНИЯ»
+
+    Кафедра 43   
+    \end{center}
+	\vfill
+	\noindent КУРСОВАЯ РАБОТА
+    \normalsize{}\\
+    \normalsize{ЗАЩИЩЕНА С ОЦЕНКОЙ}\\
+    \normalsize{РУКОВОДИТЕЛЬ}
+    
+    \underline{ст.преп}
+    \hspace{5cm}
+    \underline{\hspace{3cm}}
+    \hspace{3cm}
+    \underline{М.Д.Поляк}
+    \vfill
+    
+	\begin{center}
+	\normalsize{ПОЯСНИТЕЛЬНАЯ ЗАПИСКА}\\
+	\normalsize{К КУРСОВОЙ РАБОТЕ}\\
+	\vfill
+	\normalsize{Создание виртуального устройства}\\
+	\vfill
+    \textsc{по дисциплине: ОПЕРАЦИОННЫЕ СИСТЕМЫ И ОБОЛОЧКИ}\\
+	\end{center}
+
+	\vfill
+	\noindent РАБОТУ ВЫПОЛНИЛ
+	\normalsize{}\\  
+	\normalsize{СТУДЕНТ ГР.}\hspace{1cm}\underline{4336}
+	\hspace{2cm}
+	\underline{\hspace{3cm}}
+	\hspace{3cm}
+	\underline{К.С.Бутузов}
+\vfill
+
+\begin{center}
+  Санкт-Петербург, 2016 г.
+\end{center}
+\end{titlepage}
+\newpage
+\section{Цель работы}
+
+Знакомство с устройством ядра ОС Linux. Получение опыта разработки драйвера устройства.
+\section{Индивидуальное задание}
+
+Создание виртуального устройства. Реализовать драйвер для создания RAM-диска.
+
+Проверка правильности функционирования драйвера включает в себя создание RAM-диска, его форматирование в одну из популярных файловых систем, копирование файлов на диск и с диска, удаление RAM-диска.
+
+\section{Сравнение с аналогами}
+
+Как известно, RAM-диск – это программная технология, позволяющая хранить данные в быстродействующей оперативной памяти как на блочном устройстве. Обычно является составной частью операционной системы. В ряде случаев – это программа стороннего производителя.
+
+Основные достоинства — высокая скорость чтения (измеряется гигабайтами в секунду), высокие показатели IOPS (операций ввода-вывода в секунду) — некоторые образцы оперативной памяти типа DDR3 позволяют достигать более 1 млн IOPS (у дисковых накопителей — 20—300 IOPS, NAND SSD — десятки—сотни тысяч IOPS), отсутствие дополнительных задержек при произвольном доступе, неограниченный ресурс перезаписи (в отличие от флеш-памяти). Среди недостатков — относительно малые ёмкости модулей оперативной памяти, потеря содержимого при отключении питания, высокая стоимость за гигабайт.
+
+Linux реализует следующие виды RAM-дисков:
+
+-специализированный архив в формате cpio для размещения модулей для начальной загрузки (initrd);
+
+-файловая система, размещающаяся в памяти tmpfs (используется чаще всего для хранения временных данных, сохранение которых не актуально между перезагрузками и к которым нужен быстрый доступ);
+
+-модуль brd, позволяющий создавать блочные устройства (вида /dev/ram0);
+
+-модуль zram, позволяющий создавать блочные устройства вида /dev/zram0, хранящий данные в памяти в сжатом виде.
+
+В задании требуется написать драйвер для создания RAM-диска, а также после его создания произвести с ним простейшие операции – его форматирование в одну из популярных файловых систем, копирование файлов на диск и с диска, удаление RAM-диска. Поэтому наиболее адекватным вариантов в нашем случае будет написать модуль brd.
+
+Создание RAM-диска – достаточно стандартная и популярная операция, поэтому вариантов реализации в принципе немного, а отличаются они, как правило, размерами RAM-диска и секторов.
+
+\section{Техническая документация}
+
+\subsection{Сборка модуля}
+
+Сначала необходимо собрать модуль ядра. Для этого написан Makefile. Сборку можно выполнить командой make. На некоторых устройствах нужно подробно прописывать путь, например: 
+make -C/lib/modules/3.16.0-4-686-pae/build SUBDIRS=/home/konstant19961996/RAM-disk. Иногда нужно указать путь к исходникам ядра и к папке, где содержатся файлы
+
+\subsection{Загрузка модуля в ядро}
+
+Модуль загружается в ядро командой insmod dor.ko (где dor.ko - название модуля)
+
+\subsection{Посмотреть структуру диска}
+
+Проще всего посмотреть структуру диска при помощи команды lsblk
+
+\subsection{Отформатировать раздел}
+
+Отформатировать раздел можно с помощью команды mkfs.vfat /dev/rb1
+
+\subsection{Смонтировать раздел}
+
+Смонтировать отформатированный раздел можно командой mount -t vfat /dev/rb1 /mnt/
+
+\subsection{Записать файл в раздел}
+
+Записать файл в раздел можно при помощи команды cp. При этом стоит смотреть на размер файла, который вы хотите записать
+
+\subsection{Размонтировать раздел}
+
+Размонтировать раздел можно при помощи команды umount /mnt
+
+\subsection{Выгрузить модуль}
+
+Выгрузка модуля осуществляется командой rmmod
+
+\newpage
+
+\section{Выводы}
+
+В ходе выполнения курсовой работы был написан драйвер для создания виртуального устройства, который позволяет ускорить работу с памятью в необходимых случаях. Для этого была изучена организация памяти в ОС Linux, поскольку данный драйвер – блочного устройства. Был изучен процесс написания модулей ядра под Linux, загрузка их в ядро, а также последующая работа с ними.
+
+\newpage
+
+\section{Приложение}
+\subsection{Файл part.h}
+
+\#ifndef PART\_H
+
+\#define PART\_H
+
+\#include <linux/types.h>
+
+extern void copy\_mbr\_to\_br(u8 *disk);
+
+\endif
+\subsection{Файл part.c}
+
+\#include <linux/string.h>
+
+\#include "part.h"
+
+\#define ARRAY\_SIZE(a) (sizeof(a) / sizeof(*a))
+
+\#define SECTOR\_SIZE 512
+
+\#define MBR\_SIZE SECTOR\_SIZE
+
+\#define MBR\_DISK\_SIGNATURE\_OFFSET 440
+
+\#define MBR\_DISK\_SIGNATURE\_SIZE 4
+
+\#define PARTITION\_TABLE\_OFFSET 446
+
+\#define PARTITION\_ENTRY\_SIZE 16 
+
+\#define PARTITION\_TABLE\_SIZE 64 
+
+\#define MBR\_SIGNATURE\_OFFSET 510
+
+\#define MBR\_SIGNATURE\_SIZE 2
+
+\#define MBR\_SIGNATURE 0xAA55
+
+\#define BR\_SIZE SECTOR\_SIZE
+
+\#define BR\_SIGNATURE\_OFFSET 510
+
+\#define BR\_SIGNATURE\_SIZE 2
+
+\#define BR\_SIGNATURE 0xAA55
+
+typedef struct
+
+\{
+	unsigned char boottype;
+	 
+	unsigned char starthead;
+	
+	unsigned char startsec:6;
+	
+	unsigned char startcyl\_hi:2;
+	
+	unsigned char startcyl;
+	
+	unsigned char parttype;
+	
+	unsigned char endhead;
+	
+	unsigned char endsec:6;
+	
+	unsigned char endcyl\_hi:2;
+	
+	unsigned char endcyl;
+	
+	unsigned int abssecstart;
+	
+	unsigned int secpart;
+	
+\} PartEntry;
+
+typedef PartEntry PartTable[4];
+
+static PartTable def\_part\_table =
+
+\{
+
+	\{
+	
+		boottype: 0x00,
+		
+		starthead: 0x00,
+		
+		startsec: 0x2,
+		
+		startcyl: 0x00,
+		
+		parttype: 0x83,
+		
+		endhead: 0x00,
+		
+		endsec: 0x20,
+		
+		endcyl: 0x09,
+		
+		abssecstart: 0x00000001,
+		
+		secpart: 0x0000013F
+		
+	\},
+	
+	\{
+	
+		boottype: 0x00,
+		
+		starthead: 0x00,
+		
+		startsec: 0x1,
+		
+		startcyl: 0x0A, 
+		
+		parttype: 0x05,
+		
+		endhead: 0x00,
+		
+		endsec: 0x20,
+		
+		endcyl: 0x13,
+		
+		abssecstart: 0x00000140,
+		
+		secpart: 0x00000140
+		
+	\},
+	
+	\{
+	
+		boottype: 0x00,
+		
+		starthead: 0x00,
+		
+		startsec: 0x1,
+		
+		startcyl: 0x14,
+		
+		parttype: 0x83,
+		
+		endhead: 0x00,
+		
+		endsec: 0x20,
+		
+		endcyl: 0x1F,
+		
+		abssecstart: 0x00000280,
+		
+		secpart: 0x00000180
+		
+	\},
+	
+	\{
+	
+	\}
+	
+\};
+
+static unsigned int def\_log\_part\_br\_cyl[] = \{0x0A, 0x0E, 0x12\};
+
+static const PartTable def\_log\_part\_table[] =
+
+\{
+
+	\{
+	
+		\{
+		
+			boottype: 0x00,
+			
+			starthead: 0x00,
+			
+			startsec: 0x2,
+			
+			startcyl: 0x0A,
+			
+			parttype: 0x83,
+			
+			endhead: 0x00,
+			
+			endsec: 0x20,
+			
+			endcyl: 0x0D,
+			
+			abssecstart: 0x00000001,
+			
+			secpart: 0x0000007F
+			
+		\},
+		
+		\{
+		
+			boottype: 0x00,
+			
+			starthead: 0x00,
+			
+			startsec: 0x1,
+			
+			startcyl: 0x0E,
+			
+			parttype: 0x05,
+			
+			endhead: 0x00,
+			
+			endsec: 0x20,
+			
+			endcyl: 0x11,
+			
+			abssecstart: 0x00000080,
+			
+			secpart: 0x00000080
+			
+		\},
+		
+	\},
+	
+	\{
+	
+		\{
+		
+			boottype: 0x00,
+			
+			starthead: 0x00,
+			
+			startsec: 0x2,
+			
+			startcyl: 0x0E,
+			
+			parttype: 0x83,
+			
+			endhead: 0x00,
+			
+			endsec: 0x20,
+			
+			endcyl: 0x11,
+			
+			abssecstart: 0x00000001,
+			
+			secpart: 0x0000007F
+			
+		\},
+		
+		\{
+		
+			boottype: 0x00,
+			
+			starthead: 0x00,
+			
+			startsec: 0x1,
+			
+			startcyl: 0x12,
+			
+			parttype: 0x05,
+			
+			endhead: 0x00,
+			
+			endsec: 0x20,
+			
+			endcyl: 0x13,
+			
+			abssecstart: 0x00000100,
+			
+			secpart: 0x00000040
+			
+		\},
+		
+	\},
+	
+	\{
+	
+		\{
+		
+			boottype: 0x00,
+			
+			starthead: 0x00,
+			
+			startsec: 0x2,
+			
+			startcyl: 0x12,
+			
+			parttype: 0x83,
+			
+			endhead: 0x00,
+			
+			endsec: 0x20,
+			
+			endcyl: 0x13,
+			
+			abssecstart: 0x00000001,
+			
+			secpart: 0x0000003F
+			
+		\},
+		
+	\}
+	
+\};
+
+
+static void copymbr(u8 *disk)
+
+\{
+
+	memset(disk, 0x0, MBR\_SIZE);
+	
+	*(unsigned long *)(disk + MBR\_DISK\_SIGNATURE\_OFFSET) = 0x36E5756D;
+	
+	memcpy(disk + PARTITION\_TABLE\_OFFSET, &def\_part\_table, PARTITION\_TABLE\_SIZE);
+	
+	*(unsigned short *)(disk + MBR\_SIGNATURE\_OFFSET) = MBR\_SIGNATURE;
+	
+\}
+
+static void copybr(u8 *disk, int start\_cylinder, const PartTable *part\_table)
+
+\{
+
+	disk += (start\_cylinder * 32  * SECTOR\_SIZE);
+	
+	memset(disk, 0x0, BR\_SIZE);
+	
+	memcpy(disk + PARTITION\_TABLE\_OFFSET, part\_table,
+		PARTITION\_TABLE\_SIZE);
+		
+	*(unsigned short *)(disk + BR\_SIGNATURE\_OFFSET) = BR\_SIGNATURE;
+	
+\}
+
+void copy\_mbr\_ti\_br(u8 *disk)
+
+\{
+	int i;
+
+	copymbr(disk);
+	
+	for (i = 0; i < ARRAY\_SIZE(def\_log\_part\_table); i++)
+	
+	\{
+	
+		copybr(disk, def\_log\_part\_br\_cyl[i], &def\_log\_part\_table[i]);
+		
+	\}
+	
+\}
+
+\subsection{Файл ramdevice.h}
+
+\#ifndef RAMDEVICE\_H
+
+\#define RAMDEVICE\_H
+
+\#define RB\_SECTOR\_SIZE 512
+
+extern int ramdevice\_initial(void);
+
+extern void ramdevice\_clean(void);
+
+extern void ramdevice\_write(sector\_t sector\_off, u8 *buffer, unsigned int sectors);
+
+extern void ramdevice\_read(sector\_t sector\_off, u8 *buffer, unsigned int sectors);
+
+\#endif
+
+\subsection{Файл ramdevice.c}
+
+\#include <linux/types.h>
+
+\#include <linux/vmalloc.h>
+
+\#include <linux/string.h>
+
+\#include <linux/errno.h>
+
+\#include "ramdevice.h"
+
+\#include "part.h"
+
+\#define RB\_DEVICE\_SIZE 1024 
+
+static u8 *dev\_data;
+
+int ramdevice\_initial(void)
+
+\{
+
+	dev\_data = vmalloc(RB\_DEVICE\_SIZE * RB\_SECTOR\_SIZE);
+	
+	if (dev\_data == NULL)
+	
+		return -ENOMEM;
+	copy\_mbr\_to\_br(dev\_data);
+	
+	return RB\_DEVICE\_SIZE;
+	
+\}
+
+void ramdevice\_clean(void)
+
+\{
+
+	vfree(dev\_data);
+	
+\}
+
+void ramdevice\_write(sector\_t sector\_off, u8 *buffer, unsigned int sectors)
+
+\{
+
+	memcpy(dev\_data + sector\_off * RB\_SECTOR\_SIZE, buffer,
+		sectors * RB\_SECTOR\_SIZE);
+		
+\}
+
+void ramdevice\_read(sector\_t sector\_off, u8 *buffer, unsigned int sectors)
+
+\{
+
+	memcpy(buffer, dev\_data + sector\_off * RB\_SECTOR\_SIZE,
+		sectors * RB\_SECTOR\_SIZE);
+		
+\}
+
+\subsection{Файл ramblock.c}
+
+\#include <linux/module.h>
+
+\#include <linux/kernel.h>
+
+\#include <linux/version.h>
+
+\#include <linux/fs.h>
+
+\#include <linux/types.h>
+
+\#include <linux/spinlock.h>
+
+\#include <linux/genhd.h> 
+
+\#include <linux/blkdev.h> 
+
+\#include <linux/hdreg.h> 
+
+\#include <linux/errno.h>
+
+
+\#include "ramdevice.h"
+
+\#define RB\_FIRST\_MINOR 0
+
+\#define RB\_MINOR\_CNT 16
+
+static u\_int rb\_major = 0;
+
+
+static struct rbdevice
+
+\{
+
+	unsigned int size;
+	
+	spinlock\_t lock;
+	
+	struct request\_queue *rb\_queue;
+	
+	struct gendisk *rb\_disk;
+	
+\} rb\_dev;
+
+static int rbopen(struct block\_device *bdev, fmode\_t mode)
+
+\{
+
+	unsigned unit = iminor(bdev->bd\_inode);
+
+	printk(KERN\_INFO "rb: Device is opened\n");
+	
+	printk(KERN\_INFO "rb: Inode number is \%d\n", unit);
+
+	if (unit > RB\_MINOR\_CNT)
+	
+		return -ENODEV;
+		
+	return 0;
+	
+\}
+
+\#if (LINUX\_VERSION\_CODE < KERNEL\_VERSION(3,10,0))
+
+static int rbclose(struct gendisk *disk, fmode\_t mode)
+
+\{
+
+	printk(KERN\_INFO "rb: Device is closed\n");
+	
+	return 0;
+	
+\}
+
+\#else
+
+static void rbclose(struct gendisk *disk, fmode\_t mode)
+
+\{
+
+	printk(KERN\_INFO "rb: Device is closed\n");
+	
+\}
+
+\#endif
+
+static int rbgetgeo(struct block\_device *bdev, struct hd\_geometry *geo)
+
+\{
+
+	geo->heads = 1;
+	
+	geo->cylinders = 32;
+	
+	geo->sectors = 32;
+	
+	geo->start = 0;
+	
+	return 0;
+	
+\}
+
+
+static int rbtransfer(struct request *req)
+
+\{
+
+	int dir = rq\_data\_dir(req);
+	
+	sector\_t start\_sector = blk\_rq\_pos(req);
+	
+	unsigned int sector\_cnt = blk\_rq\_sectors(req);
+
+\#if (LINUX\_VERSION\_CODE < KERNEL\_VERSION(3,14,0))
+
+\#define BV\_PAGE(bv) ((bv)->bv\_page)
+
+\#define BV\_OFFSET(bv) ((bv)->bv\_offset)
+
+\#define BV\_LEN(bv) ((bv)->bv\_len)
+
+	struct bio\_vec *bv;
+	
+\#else
+
+\#define BV\_PAGE(bv) ((bv).bv\_page)
+
+\#define BV\_OFFSET(bv) ((bv).bv\_offset)
+
+\#define BV\_LEN(bv) ((bv).bv\_len)
+
+	struct bio\_vec bv;
+	
+\#endif
+
+	struct req\_iterator iter;
+
+	sector\_t sector\_offset;
+	
+	unsigned int sectors;
+	
+	u8 *buffer;
+
+	int ret = 0;
+
+
+	sector\_offset = 0;
+	
+	rq\_for\_each\_segment(bv, req, iter)
+	
+	\{
+	
+		buffer = page\_address(BV\_PAGE(bv)) + BV\_OFFSET(bv);
+		
+		if (BV\_LEN(bv) \% RB\_SECTOR\_SIZE != 0)
+		
+		\{
+		
+			printk(KERN\_ERR "rb: Should never happen: "
+			
+				"bio size (\%d) is not a multiple of RB\_SECTOR\_SIZE (\%d).\n"
+				
+				"This may lead to data truncation.\n",
+				
+				BV\_LEN(bv), RB\_SECTOR\_SIZE);
+				
+			ret = -EIO;
+			
+		\}
+		
+		sectors = BV\_LEN(bv) / RB\_SECTOR\_SIZE;
+		
+		printk(KERN\_DEBUG "rb: Start Sector: \%llu, Sector Offset: \%llu; Buffer: \%p; Length: \%u sectors\n",
+		
+			(unsigned long long)(start\_sector), (unsigned long long)(sector\_offset), buffer, sectors);
+			
+		if (dir == WRITE) 
+		
+		\{
+		
+			ramdevice\_write(start\_sector + sector\_offset, buffer, sectors);
+			
+		\}
+		
+		else 
+		
+		\{
+		
+			ramdevice\_read(start\_sector + sector\_offset, buffer, sectors);
+			
+		\}
+		
+		sector\_offset += sectors;
+		
+	\}
+	
+	if (sector\_offset != sector\_cnt)
+	
+	\{
+	
+		printk(KERN\_ERR "rb: bio info doesn't match with the request info");
+		
+		ret = -EIO;
+		
+	\}
+
+	return ret;
+	
+\}
+	
+
+static void rbrequest(struct request\_queue *q)
+
+\{
+
+	struct request *req;
+	
+	int ret;
+
+	while ((req = blk\_fetch\_request(q)) != NULL)
+	
+	\{
+	
+\#if 0
+		
+		if (!blk\_fs\_request(req))
+		
+		\{
+		
+			printk(KERN\_NOTICE "rb: Skip non-fs request\n");
+			
+			\_\_blk\_end\_request\_all(req, 0);
+			
+			continue;
+			
+		\}
+		
+\#endif
+
+		ret = rb\_transfer(req);
+		
+		\_\_blk\_end\_request\_all(req, ret);
+		
+	\}
+	
+\}
+
+
+static struct block\_device\_operations rb\_fops =
+
+\{
+	
+	.owner = THIS\_MODULE,
+	
+	.open = rb\_open,
+	
+	.release = rb\_close,
+	
+	.getgeo = rb\_getgeo,
+	
+\};
+	
+
+static int \_\_init rbinit(void)
+
+\{
+
+	int ret;
+
+	if ((ret = ramdevice\_init()) < 0)
+	
+	\{
+	
+		return ret;
+		
+	\}
+	
+	rb\_dev.size = ret;
+
+	rb\_major = register\_blkdev(rb\_major, "rb");
+	
+	if (rb\_major <= 0)
+	
+	\{
+	
+		printk(KERN\_ERR "rb: Unable to get Major Number\n");
+		
+		ramdevice\_cleanup();
+		
+		return -EBUSY;
+		
+	\}
+
+	spin\_lock\_init(&rb\_dev.lock);
+	
+	rb\_dev.rb\_queue = blk\_init\_queue(rb\_request, &rb\_dev.lock);
+	
+	if (rb\_dev.rb\_queue == NULL)
+	
+	\{
+	
+		printk(KERN\_ERR "rb: blk\_init\_queue failure\n");
+		
+		unregister\_blkdev(rb\_major, "rb");
+		
+		ramdevice\_cleanup();
+		
+		return -ENOMEM;
+		
+	\}
+	
+	rb\_dev.rb\_disk = alloc\_disk(RB\_MINOR\_CNT)
+	;
+	if (!rb\_dev.rb\_disk)
+	
+	\{
+	
+		printk(KERN\_ERR "rb: alloc\_disk failure\n");
+		
+		blk\_cleanup\_queue(rb\_dev.rb\_queue);
+		
+		unregister\_blkdev(rb\_major, "rb");
+		
+		ramdevice\_cleanup();
+		
+		return -ENOMEM;
+		
+	\}
+
+	rb\_dev.rb\_disk->major = rb\_major;
+	
+	rb\_dev.rb\_disk->first\_minor = RB\_FIRST\_MINOR;
+	
+	rb\_dev.rb\_disk->fops = &rb\_fops;
+	
+	rb\_dev.rb\_disk->private\_data = &rb\_dev;
+	
+	rb\_dev.rb\_disk->queue = rb\_dev.rb\_queue;
+	
+	sprintf(rb\_dev.rb\_disk->disk\_name, "rb");
+	
+	set\_capacity(rb\_dev.rb\_disk, rb\_dev.size);
+	
+	add\_disk(rb\_dev.rb\_disk);
+	
+	printk(KERN\_INFO "rb: Ram Block driver initialised (\%d sectors; \%d bytes)\n",
+		rb\_dev.size, rb\_dev.size * RB\_SECTOR\_SIZE);
+
+	return 0;
+	
+\}
+
+static void \_\_exit rbcleanup(void)
+
+\{
+
+	del\_gendisk(rb\_dev.rb\_disk);
+	
+	put\_disk(rb\_dev.rb\_disk);
+	
+	blk\_cleanup\_queue(rb\_dev.rb\_queue);
+	
+	unregister\_blkdev(rb\_major, "rb");
+	
+	ramdevice\_cleanup();
+	
+\}
+
+module\_init(rb\_init);
+
+module\_exit(rb\_cleanup);
+
+MODULE\_LICENSE("GPL");
+
+MODULE\_AUTHOR("Konstantin Butuzov <bks1906@gmail.com>");
+
+MODULE\_DESCRIPTION("Ram Block Driver");
+
+MODULE\_ALIAS\_BLOCKDEV\_MAJOR(rb\_major);
+
+\subsection{Makefile}
+
+ifeq (\$(KERNELRELEASE),)
+
+	KERNEL\_SOURCE := /lib/modules/\$(shell uname -r)/build
+	
+	PWD := \$(shell pwd)
+
+module:
+
+	\$(MAKE) -C \$(KERNEL\_SOURCE) SUBDIRS=\$(PWD) modules
+
+clean:
+
+	\$(MAKE) -C \$(KERNEL\_SOURCE) SUBDIRS=\$(PWD) clean
+
+
+else
+
+	obj-m := dor.o
+	
+	dor-y := ramblock.o ramdevice.o part.o
+
+endif
+
+\end{document}
